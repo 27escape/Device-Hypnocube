@@ -1,0 +1,136 @@
+#!/usr/bin/env perl
+# PODNAME: Demo simple control of a hypnocube
+
+use 5.010;
+use strict ;
+use warnings ;
+use Device::Hypnocube ;
+use App::Basis ;
+
+my $DEFAULT_COLOR = 'black' ;
+my $cube ;
+
+# ----------------------------------------------------------------------------
+# clean up when we are finished
+sub cleanup_func {
+
+    if( $cube) {
+        # we are done
+#         $cube->reset() ;
+#         $cube->logout() ;
+    }
+}
+
+# ----------------------------------------------------------------------------
+
+sub demo {
+    my $count = 3 ;
+    my @cols = ( 0x0, 0x20, 0x40, 0x80) ;
+
+    foreach my $c ($cube->list_colors()) {
+        say "clear frame $c" ;
+        $cube->clear( $c) ;
+        $cube->update() ;
+        sleep( 1) ;
+    }
+
+    say "x frame" ;
+    foreach my $x ( 0..$count) {
+        $cube->xplane( $x, 'red') ;
+        $cube->update() ;
+        sleep( 1) ;
+    }
+
+    say "y frame" ;
+    foreach my $y ( 0..$count) {
+        $cube->yplane( $y, 'green') ;
+        $cube->update() ;
+        sleep( 1) ;
+    }
+
+    say "z frame" ;
+    foreach my $z ( 0..$count) {
+        $cube->zplane( $z, 'blue') ;
+        $cube->update() ;
+        sleep( 1) ;
+    }
+
+    say "color table" ;
+    $cube->clear() ;
+    foreach my $i ( 0.. 63) {
+        my $x = $i & 3 ;
+        my $y = ($i / 4) & 3 ;
+        my $z = ($i / 16) & 3 ;
+        my $r = $cols[$x] ;
+        my $g = $cols[$y] ;
+        my $b = $cols[$z] ;
+        $cube->pixel( $x, $y, $z, $r, $g, $b) ;
+    }
+    $cube->update() ;
+}
+
+# ----------------------------------------------------------------------------
+sub other_stuff {
+    my $count = 0 ;
+    foreach my $color ($cube->list_colors()) {
+        my ($x, $y, $z) = ( $count % 4, int($count / 4), 0) ;
+        $count++ ;
+        say "pixel ($x, $y, $z) $color" ;
+
+        $cube->pixel( $x, $y, $z, $color) ;
+        $cube->update() ;
+        usleep( 10000) ;
+    }
+}
+
+# ----------------------------------------------------------------------------
+# main
+my %opt = init_app(
+    help_text       => 'Control the hypnocube'
+#     , help_cmdline  => 'filename'
+    , options       =>  {
+        'device|d=s'    => "serial device to use"
+        , 'pixel|p=s'   => 'pixel coordinates, comma separated [2,3,4]'
+        , 'color|c=s'   => 'pixel color, either color name or rgb comma separated'
+        , 'reset|r'     => 'reset to default state'
+        , 'clear=s'     => 'clear cube to color, either color name or rgb comma separated'
+        , 'demo'        => 'run some demo stuff'
+        , 'verbose'     => 'tell us whats going on'
+    }
+    , cleanup  => \&cleanup_func    # optional func to call to clean up
+) ;
+
+show_usage( "Device missing or not recognised ($opt{device})") if( !$opt{device} || ! -c $opt{device}) ;
+
+$cube = Device::Hypnocube->new( serial => $opt{device}, verbose => $opt{verbose}) ;
+
+# login so we can do advanced stuff
+$cube->login() ;
+
+# the demo mode takes precidence over everything else
+if( $opt{demo}) {
+    demo() ;
+} else {
+    if( $opt{reset}) {
+        $cube->reset() ;
+    }
+
+    if( $opt{clear}) {
+        $cube->clear( split( ',', $opt{clear})) ;
+    }
+
+    # # say helo
+    # $cube->ping() ;
+
+    if( $opt{pixel}) {
+        my ($x, $y, $z) = (0,0,0) ;
+        ($x, $y, $z) = split( ',', $opt{pixel}) if( $opt{pixel}) ;
+        my ($r, $g, $b) = ('white') ;
+        ($r, $g, $b) = split( ',', $opt{color}) if( $opt{color}) ;
+
+        $cube->pixel( $x, $y, $z, $r, $g, $b) ;
+    }
+
+    # we only need to done one update for everything asked
+    $cube->update($cube) ;
+}

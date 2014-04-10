@@ -1,0 +1,67 @@
+#!/usr/bin/env perl
+# PODNAME: simple webserver to control a hypnocube
+
+# quite script to make a simple webserver to convert web-requests into
+# requests that can be piped to hypnocube
+# ----------------------------------------------------------------------------
+
+use 5.16.0;
+use strict;
+use warnings;
+use Dancer;
+use Data::Printer;
+use Path::Tiny ;
+use YAML::XS qw( Load) ;
+
+# ----------------------------------------------------------------------------
+# override config
+
+set port => 4444;
+
+set daemon       => 1;
+set startup_info => 0;
+set serializer => 'JSON';
+
+use constant HYPNO_PIPE => '/tmp/hypnocube';
+use constant BUFFER_FILE => HYPNO_PIPE . '.buffer';
+
+# ----------------------------------------------------------------------------
+# routes
+
+# get the buffer
+get '/buffer' => sub {
+    my $buff = Load(path( BUFFER_FILE)->slurp) ;
+    return $buff ;
+} ;
+
+# put a new buffer
+put '/buffer' => sub {
+    # my $buff = Load(path( BUFFER_FILE)->slurp) ;
+    # return $buff ;
+} ;
+
+
+# all general requests
+
+get qr{.*} => sub {
+    my $path = request->path;
+    $path =~ s|^/||;    # remove leading path
+
+    my $cmd = join( ' ', split( /\//, $path ) );
+
+    # in case its easier for command lines to use : than ;
+    $cmd =~ s/:/;/g;
+    $cmd .= "\n";
+
+    # we append data, as spew creates a tempfile and then overwrites
+    open( my $hypno, ">>", HYPNO_PIPE );
+    print $hypno $cmd;
+    close($hypno);
+
+    return {command => $cmd};
+
+};
+
+# ----------------------------------------------------------------------------
+
+dance;

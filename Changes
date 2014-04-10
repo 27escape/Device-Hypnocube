@@ -1,0 +1,5 @@
+* v1.1 2014-03-06 
+  Hypnocube.pm
+    new method buffer_offset
+  cubepipe
+    adding background processing, new effect "matrix"

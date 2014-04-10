@@ -1,0 +1,25 @@
+#!/bin/bash
+# PODNAME: make hypnocube respond to cheerlights
+# http://www.cheerlights.com/control-cheerlights
+
+# to change global cheerlights colors
+# http://www.cheerlights.com/control-cheerlights
+# Example Tweet: @CheerLights Paint the town red
+
+lastcolor=""
+while true
+do
+  # let us know that things are still working
+#  echo "clear black ; update" >>/tmp/hypnocube
+#  sleep 0.5
+  # fetch the cheelightss status and update the hypnocube
+  color=`curl -s http://api.thingspeak.com/channels/1417/field/1/last.json | perl -ne '/.*?"field1":"(.*?)"/ ; print "$1";'`
+  if [ "$color" != "$lastcolor" ] ; then
+    date=`date`
+    echo "$date : $color"
+    lastcolor=$color
+  fi
+  cube "sphere $color;update\n" 
+  # and give it a chance to change
+  sleep 10
+done

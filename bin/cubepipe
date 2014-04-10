@@ -1,0 +1,652 @@
+#!/usr/bin/env perl
+# PODNAME: control the hypnocube via commands coming in over a named pipe
+# this will be a daemon process
+# sample commands:-
+# clear black
+# clear 0,0,0
+# pixel 2,2,2 blue
+# pixel 2,2,1 255,255,255
+# update
+# xplane 0 green
+# zplane 1 255,255,255
+# sphere red
+# update
+# frame [64 sets of rgb values] in correct order
+# update
+# ### not this ### getframe [gets current displayed frame]]
+# ### not this ### info
+
+use 5.16.0;
+use strict;
+use warnings;
+use Fcntl;
+use Device::Hypnocube;
+use Time::HiRes qw( sleep);
+use Try::Tiny;
+use App::Basis;
+use Data::Printer;
+
+# ----------------------------------------------------------------------------
+
+use constant FLASH_SLEEP => 0.5;
+use constant PULSE_SLEEP => 0.2;
+
+# 30 times/second is the highest frequency we can write to the cube
+use constant FREQUENCY => 30;
+
+# dreive a clock tick, make sure its fractional and not an int!
+use constant TICK => 1.0 / FREQUENCY;
+
+# ----------------------------------------------------------------------------
+
+# set hypnocube defaults
+#my $DEVICE = '/dev/ttyUSB0' ;
+my $DEVICE       = '/dev/ttyS0';
+my $DEFAULT_FIFO = '/tmp/hypnocube';
+
+my $remove_pipe  = 0;
+my %pulse_colors = (
+    red    => [ 1, 0, 0 ],
+    blue   => [ 0, 0, 1 ],
+    green  => [ 0, 1, 0 ],
+    yellow => [ 1, 1, 0 ],
+    white  => [ 1, 1, 1 ],
+    lilac  => [ 1, 0, 1 ],
+    cyan   => [ 0, 1, 1 ],
+);
+
+# ----------------------------------------------------------------------------
+
+my %valid_commands = (
+
+    # repeat is a special command handled in process_line
+    update   => \&_update,
+    cls      => \&_clear,
+    clear    => \&_clear,
+    pix      => \&_pixel,
+    pixel    => \&_pixel,
+    pos      => \&_position,
+    position => \&_position,
+    xp       => \&_xplane,
+    xplane   => \&_xplane,
+    yp       => \&_yplane,
+    yplane   => \&_yplane,
+    zp       => \&_zplane,
+    zplane   => \&_zplane,
+    sphere   => \&_sphere,
+    sleep    => \&_sleep,
+    pulse    => \&_pulse,
+    flash    => \&_background_flash,
+    matrix   => \&_background_matrix,
+    colors   => \&_colors,
+);
+
+# ----------------------------------------------------------------------------
+my $background_process;
+my $background_name;
+my $background_must_wait;
+
+# ----------------------------------------------------------------------------
+sub set_background_name {
+    $background_name = shift;
+}
+
+# ----------------------------------------------------------------------------
+sub set_background_process {
+    $background_process = shift;
+    $background_must_wait = shift || 1;
+}
+
+# ----------------------------------------------------------------------------
+# remove the background process
+sub stop_background {
+    set_background_name(undef);
+    set_background_process(undef);
+}
+
+# ----------------------------------------------------------------------------
+# run through the background process once
+sub tick_background {
+    $background_process->();
+}
+
+# ----------------------------------------------------------------------------
+# wait for the background_process to finish
+# unless its interuptable, in which case stop it now!
+sub wait_background {
+    if ($background_must_wait) {
+        while ($background_process) {
+            tick_background();
+            sleep(TICK);
+        }
+    }
+}
+
+# ----------------------------------------------------------------------------
+# clean up when we are finished
+sub cleanup_func {
+    if ($remove_pipe) {
+        unlink($DEFAULT_FIFO);
+    }
+}
+
+# -----------------------------------------------------------------------------
+# update the framebuffer into the cube
+sub _update {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->update();
+}
+
+# -----------------------------------------------------------------------------
+# set entire cube to one color
+# ### clear black
+# ### clear 0,0,0
+sub _clear {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->clear(@args);
+}
+
+# -----------------------------------------------------------------------------
+# set a single pixel to one color
+# ### pixel 2,2,2 blue
+# ### pixel 2,2,1 255,255,255
+sub _pixel {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->pixel(@args);
+}
+
+# -----------------------------------------------------------------------------
+# set the numbered position (0..63) to a color
+# position 10 red
+# position 32 red
+sub _position {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    my $pos       = shift @args;    # get the position
+
+    # limit size, wrap around
+    # no finesse here, work on the basis that it is 4x4x4 cube
+    my $x = $pos & 3;
+    $pos >>= 2;
+    my $y = $pos & 3;
+    $pos >>= 2;
+    my $z = $pos & 3;
+
+    # pass rest of the colour data through
+    $cube->pixel( $x, $y, $z, @args );
+}
+
+# -----------------------------------------------------------------------------
+# set an entire plane to a single color
+# ### xplane 0 green
+sub _xplane {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->xplane(@args);
+}
+
+# -----------------------------------------------------------------------------
+# ### yplane 2 255,255,255
+sub _yplane {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->yplane(@args);
+}
+
+# -----------------------------------------------------------------------------
+# ### zplane 1 255,255,255
+sub _zplane {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->zplane(@args);
+}
+
+# -----------------------------------------------------------------------------
+# draw a sphere into the cuble
+# sphere red
+sub _sphere {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    $cube->clear(@args);
+    for ( my $i = 0; $i < 4; $i++ ) {
+        $cube->pixel( 0,  0,  $i, 'black' );
+        $cube->pixel( 0,  3,  $i, 'black' );
+        $cube->pixel( 3,  0,  $i, 'black' );
+        $cube->pixel( 3,  3,  $i, 'black' );
+        $cube->pixel( 0,  $i, 0,  'black' );
+        $cube->pixel( 0,  $i, 3,  'black' );
+        $cube->pixel( 3,  $i, 0,  'black' );
+        $cube->pixel( 3,  $i, 3,  'black' );
+        $cube->pixel( $i, 0,  0,  'black' );
+        $cube->pixel( $i, 0,  3,  'black' );
+        $cube->pixel( $i, 3,  0,  'black' );
+        $cube->pixel( $i, 3,  3,  'black' );
+    }
+}
+
+# -----------------------------------------------------------------------------
+# sleep for tenths of a second, cannot be interrupted
+# ### sleep 0.1
+sub _sleep {
+    my $self_name = shift;
+    my $cube      = shift;
+    my ($sleep)   = @_;
+    $cube->update();
+    $sleep ||= 1;
+    $sleep = $sleep < 10 ? $sleep : 10;
+
+    sleep($sleep);
+}
+
+# -----------------------------------------------------------------------------
+# pulse the entire cube color up and down
+# ### pulse 5 red
+sub _pulse {
+    my $self_name = shift;
+    my $cube      = shift;
+    my @args      = @_;
+    my $counter   = $args[0] || 0;
+    $counter = 3 if ( $counter > 3 );    # for max pulse as 3
+    my $color = $args[1];
+    $color = 'white' if ( !grep( /$color/, keys %pulse_colors ) );
+    for ( my $i = 0; $i < $args[0]; $i++ ) {
+
+        # on
+        my @val = qw( 0 31 63 95 127 159 191 223 255);
+        for ( my $j = 0; $j <= 8; $j++ ) {
+            my @a = map { $_ * $val[$j] } @{ $pulse_colors{$color} };
+            $cube->clear(@a);
+            $cube->update();
+            sleep(PULSE_SLEEP);
+        }
+
+        # pulsing leaves the color on, so skip last off
+        last if ( $i >= $counter - 1 );
+
+        # off
+        for ( my $j = 0; $j <= 8; $j++ ) {
+            my @a = map { $_ * $val[ 8 - $j ] } @{ $pulse_colors{$color} };
+            $cube->clear(@a);
+            $cube->update();
+        }
+    }
+}
+
+# -----------------------------------------------------------------------------
+# display all the colors
+sub _colors {
+    my $self_name = shift;
+    my $cube      = shift;
+
+    # get the buffer just to get the correct sized thing
+    $cube->clear();
+    my $buffer = $cube->get_buffer();
+    my @colors = $cube->list_colors();
+
+    # say STDERR scalar( @colors) . "colors:\n  " . join( "\n  ", @colors) ;
+    # add to the start of the buffer and remove from the end
+    foreach my $c (@colors) {
+        unshift @{$buffer}, [ $cube->get_color( $c, undef, undef, 'black' ) ];
+        pop @{$buffer};
+    }
+
+    $cube->set_buffer($buffer);
+}
+
+# -----------------------------------------------------------------------------
+# flash the cube on and off a number of times as a background_process
+# ### flash 5
+sub _background_flash {
+    my $self_name = shift;
+    my $cube      = shift;
+    my ($counter) = @_;
+    $counter //= 0;
+    $counter = $counter <= 10 ? $counter : 10;    # restrict to 10 flashes max
+    my $buffer = $cube->get_buffer();
+
+    # setup anonymous sub to handle the background stuff
+    set_background_name($self_name);
+    set_background_process(
+        sub {
+
+            # variables need to persist over repeated calls to this sub
+            state $count = 0;
+            state $loops = 0;
+
+            $count++;
+            if ( $count == int( FREQUENCY / 3 ) ) {    # 1/3 sec
+                $cube->clear('black');
+                $cube->update();
+            }
+            elsif ( $count == int( ( 2 * FREQUENCY ) / 3 ) ) {    # next 1/3 sec
+                $cube->set_buffer($buffer);
+                $cube->update();
+                $count = 0;
+                if ( ++$loops >= $counter ) {
+
+                    # remove ourselves from the background process
+                    stop_background();
+                }
+            }
+        },
+        1                                                         # we want to wait for this to complete
+    );
+}
+
+# -----------------------------------------------------------------------------
+# get a 1 in 'chance' value
+sub _chance {
+    my ($chance) = @_;
+
+    return ( int( rand($chance) ) % ( $chance - 1 ) ) == 0;
+}
+
+# -----------------------------------------------------------------------------
+# flash the cube on and off a number of times as a background_process
+# ### matrix green
+sub _background_matrix {
+    my $self_name = shift;
+    my $cube      = shift;
+    my (@args)    = @_;
+
+    # default to green matrix
+    $args[0] //= 'green';
+
+    # and if a primary variant remove it
+    $args[0] =~ s/^dark|^mid|^bright//;
+
+    my @colors = $cube->list_colors();
+    my $mono   = 0;
+
+    # if the color requested has variants lets mostly use a mono scheme
+    $mono = 1 if ( grep( "mid$args[0]", @colors ) );
+
+    # setup anonymous sub to handle the background stuff
+    set_background_name($self_name);
+    set_background_process(
+        sub {
+            # variables need to persist over repeated calls to this sub
+            state $count  = 0;
+            state $planes = [];
+            $count++;
+
+            # we will change the state every 15 ticks
+            $count %= FREQUENCY ;
+            if ( !$count ) {
+
+                # get the buffer just to get the correct sized thing
+                my $buffer = $cube->get_buffer();
+
+                # copy the contents of planes 0-2 to 1-3
+                # and create a new plane 0
+                # or add a new plane to the top of the stack and drop
+                # the last one off!
+
+                my $max = int( rand(10) );
+
+                # drop the first 16 items (4x4) plane from the buffer
+                # and add new empty elements to the end to re-create the top plane
+                for ( my $i = 0; $i < 16; $i++ ) {
+                    shift @{$buffer};
+                    push @{$buffer}, [ 0, 0, 0 ];
+                }
+
+                # add in our random pixels to the top plane (3)
+                for ( my $i = 0; $i < $max; $i++ ) {
+                    my $offset = $cube->buffer_offset( int( rand(4) ), 3, int( rand(4) ) );
+
+                    my ( $r, $g, $b ) = $cube->get_color( $args[0], $args[2], $args[2] );
+
+                    # decide if we are going to change the color
+                    if ( _chance(10) ) {
+
+                        if ( $mono && _chance(5) ) {
+
+                            # lets pick versions of the main color
+                            my @prefix = ( "dark", "mid", "", "bright" );
+                            my $p = $prefix[ int( rand( scalar(@prefix) ) ) ];
+                            ( $r, $g, $b ) = $cube->get_color("$p$args[0]");
+                        }
+                        elsif ( ( $mono && _chance(20) ) || ( $args[0] =~ /^[\d|\s]+$/ && _chance(5) ) ) {
+                            my $off = int( rand( scalar(@colors) ) );
+                            ( $r, $g, $b ) = $cube->get_color( $colors[$off] );
+                        }
+                    }
+                    elsif ($mono) {
+
+                        # lets choose the dark version most of the time
+                        ( $r, $g, $b ) = $cube->get_color("dark$args[0]");
+                    }
+                    $buffer->[$offset] = [ $r, $g, $b ];
+                }
+
+                # write the new buffer and update
+                $cube->set_buffer($buffer);
+                $cube->update();
+            }
+
+        },
+        0    # we must stop matix as soon as anything else wants to do stuff
+    );
+}
+
+# -----------------------------------------------------------------------------
+# process the line and send relevant command to the cube
+# ### frame [64 sets of rgb values] in correct order
+# ### repeat 4
+# ### flash 5
+# we can have multiple lines split by semi-colons
+
+sub process_section {
+    my ( $cube, $sections, $verbose ) = @_;
+
+    foreach my $line (@$sections) {
+
+        # do things with the line
+        # trim off lead/trail whitespace
+        $line =~ s/^\s*(.*?)\s*$/$1/;
+        next if ( !$line );
+        say "processing [$line] " if ($verbose);
+        my ( $cmd, @args ) = split( /[\s,]/, $line );
+        next if ( !$cmd );
+        say "cmd '$cmd', args " . p(@args) if ($verbose);
+
+        # lets not do any args error checking for now
+        $_ = $cmd;
+
+        # special command to force wait for any background process to complete
+        if ( $cmd eq 'wait' ) {
+            wait_background();
+        }
+        else {
+            my $handler = $valid_commands{$cmd};
+
+            if ($handler) {
+
+                # if we are actioning a command then we must stop any existing background_process
+                stop_background();
+
+                $handler->( $cmd, $cube, @args );
+            }
+            else {
+                say "Unknown command $cmd";
+            }
+        }
+    }
+}
+
+# -----------------------------------------------------------------------------
+sub process_line {
+    my ( $cube, $lines, $verbose ) = @_;
+    my @sections;
+    my @chunks = split( /;/, $lines );
+
+    foreach my $ele (@chunks) {
+
+        # handle the repeat command
+        if ( $ele =~ /repeat\s*(\d+)/ ) {
+            my $repeat = abs($1);
+            $repeat ||= 1;
+            while ( $repeat-- ) {
+                process_section( $cube, \@sections, $verbose );
+            }
+            @sections = ();
+        }
+        else {
+            push @sections, $ele;
+        }
+
+    }
+
+    # process any final sections
+    if (@sections) {
+        process_section( $cube, \@sections, $verbose );
+    }
+}
+
+# ----------------------------------------------------------------------------
+# non blocking read from file/pipe
+# http://davesource.com/Solutions/20080924.Perl-Non-blocking-Read-On-Pipes-Or-Files.html
+# Returns:  ($eof,@lines)
+sub nb_readlines {
+    state %nonblockGetLines_last;    # hold onto some data for next time if needed
+    my ( $fh, $timeout, $buffsize ) = @_;
+
+    if ( !$fh ) {
+        say "bad filehandle";
+        return 1;
+    }
+
+    my $rfd = '';
+    $nonblockGetLines_last{$fh} //= '';    # nothing previous for this fh
+
+    $timeout //= 0;                        # timeout is 0 if not defined
+
+    # get a large chunk if nothing is passed, don't allow 0
+    $buffsize ||= 1024 * 1024;
+
+    vec( $rfd, fileno($fh), 1 ) = 1;
+    my $nfound = select( $rfd, undef, undef, $timeout );
+    return ( 0, 0 ) if ( !$nfound );
+
+    # I'm not sure the following is necessary?
+    return ( 0, 0 ) if ( !vec( $rfd, fileno($fh), 1 ) );
+    my $buf = '';
+    my $n = sysread( $fh, $buf, $buffsize );
+
+    # If we're done, make sure to send the last unfinished line
+    return ( 1, $nonblockGetLines_last{$fh} ) if ( !$n );
+
+    # Prepend the last unfinished line
+    $buf = $nonblockGetLines_last{$fh} . $buf;
+
+    # And save any newly unfinished lines
+    $nonblockGetLines_last{$fh} = ( substr( $buf, -1 ) !~ /[\r\n]/ && $buf =~ s/([^\r\n]*)$// ) ? $1 : '';
+
+    $buf ? ( 0, $buf ) : ( 0, undef );
+}
+
+# ----------------------------------------------------------------------------
+# main
+
+my %opt = init_app(
+    help_text => 'Control the hypnocube via a named pipe'
+
+        #     , help_cmdline  => 'filename'
+    ,
+    options => {
+        'device|d=s' => "serial device to use [default: $DEVICE]",
+        'pipe|p=s'   => "named pipe to use/create [default: $DEFAULT_FIFO]",
+        'remove|r'   => 'remove pipe on program exit',
+        'daemon'     => 'run as a daemon process, otherwise will remain in foreground',
+        'verbose'    => 'tell us whats going on'
+    },
+    cleanup => \&cleanup_func    # optional func to call to clean up
+);
+
+# set defaults if needed
+$opt{device} ||= $DEVICE;
+$DEFAULT_FIFO = $opt{pipe} if ( $opt{pipe} );
+
+show_usage("Device missing or not recognised ($opt{device})") if ( !$opt{device} || !-c $opt{device} );
+
+# start the daemon process if needed
+
+if ( $opt{daemon} ) {
+    try {
+        # parent should exit
+        exit(0) if ( !daemonise() );
+    }
+    catch {
+        msg_exit( 'Failed to create daemon process', 1 );
+    };
+}
+else {
+    say 'running in foreground';
+}
+
+# now connect to the cube and start listening to the pipe
+my $cube;
+$cube = Device::Hypnocube->new( serial => $opt{device}, verbose => $opt{verbose} );
+msg_exit( 'Failed to login to hypnocube', 1 ) if ( !$cube->login() );
+say 'Logged in to cube' if ( $opt{verbose} );
+
+my $reopen = 1;
+my $fifo;
+while (1) {
+
+    # exit if signature file manually removed
+    # create the pipe if needed each time around
+    if ($reopen) {
+        if ( !-e $DEFAULT_FIFO ) {
+            POSIX::mkfifo( $DEFAULT_FIFO, 0666 ) or msg_exit( "Cannot create named pipe", 2 );
+
+            # cos mkfifo does not seem to change permissions properly
+            system("chmod a+rw '$DEFAULT_FIFO'");
+        }
+        else {
+            msg_exit( 'Cannot use named pipe, it already exists as something else', 1 ) if ( !-p $DEFAULT_FIFO );
+        }
+
+        msg_exit( 'Failed to open named pipe', 3 ) if ( !sysopen( $fifo, $DEFAULT_FIFO, O_RDONLY | O_NONBLOCK ) );
+
+        say 'Opened named pipe for reading' if ( $opt{verbose} );
+        $reopen = 0;
+    }
+
+    my ( $eof, $line ) = nb_readlines( $fifo, 0, 10000 );
+
+    if ($line) {
+
+        chomp($line);
+        if ($line) {
+            say 'received ' . "'$line'" if ( $opt{verbose} );
+
+            # decide how to handle things
+            process_line( $cube, $line, $opt{verbose} );
+        }
+    }
+
+    if ($eof) {
+        close($fifo);
+        say 'Closed named pipe' if ( $opt{verbose} );
+        $reopen = 1;
+    }
+
+    if ($background_process) {
+        tick_background();
+    }
+
+    sleep(TICK);
+}

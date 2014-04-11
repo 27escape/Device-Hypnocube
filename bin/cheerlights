@@ -1,6 +1,6 @@
 #!/bin/bash
-# PODNAME: make hypnocube respond to cheerlights
-# http://www.cheerlights.com/control-cheerlights
+# PODNAME: cheerlights
+# ABSTRACT: make hypnocube respond to cheerlights
 
 # to change global cheerlights colors
 # http://www.cheerlights.com/control-cheerlights

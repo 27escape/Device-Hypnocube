@@ -1,5 +1,6 @@
 #!/bin/bash
-# PODNAME: quick script to send things to hypnocube rather than piping yourself
+# PODNAME: cube
+# ABSTRACT: quick script to send things to hypnocube rather than piping yourself
 
 # easy way to write to cube rather than echoing to the pipe
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
-# PODNAME: simple webserver to control a hypnocube
+# PODNAME: hypnoweb
+# ABSTRACT: simple webserver to control a hypnocube
 
 # quite script to make a simple webserver to convert web-requests into
 # requests that can be piped to hypnocube

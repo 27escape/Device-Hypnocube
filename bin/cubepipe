@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
-# PODNAME: control the hypnocube via commands coming in over a named pipe
+# PODNAME: cubepipe
+# ABSTRACT: control the hypnocube via commands coming in over a named pipe
+
 # this will be a daemon process
 # sample commands:-
 # clear black

@@ -19,26 +19,27 @@ use warnings;
 use Try::Tiny;
 use File::Basename;
 
-use Test::More tests => 3;
+use Test::More tests => 2;
 
 BEGIN { use_ok('Device::Hypnocube'); }
 
-my $cube = Device::Hypnocube->new( serial => '/dev/ttyS0' );
-isa_ok( $cube, 'Device::Hypnocube' );
 
 # we cannot test if the cube can connect to a hypnocube as not many people have them
 
 SKIP: {
 
-    if ( $ENV{AUTHOR_TESTING} ) {
+    # if you do not have a serial port or access to it you cannot test
+    if ( $ENV{HAS_TTY} ) {
 
-        subtest 'authors_own' => sub {
+        subtest 'has_tty' => sub {
             plan tests => 1;    # we need to add some data for the search tests
-            ok( 1, "ready for more tests" );
+            my $cube = Device::Hypnocube->new( serial => '/dev/ttyS0' );
+            isa_ok( $cube, 'Device::Hypnocube' );
+            # no other tests as its pretty much all visual feedback
         };
     }
     else {
-        subtest 'not_author' => sub {
+        subtest 'no_tty' => sub {
             plan tests => 1;
             ok( 1, "no more user tests" );
         };

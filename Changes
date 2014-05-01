@@ -1,3 +1,6 @@
+* 1.3 
+  * minor fixes in scripts
+  * restore error handling in Device::Hypnocube
 * v1.2 2014-04-11
   * CPAN release, still need to do documentation
 * v1.1 2014-03-06 

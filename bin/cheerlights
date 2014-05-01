@@ -19,7 +19,10 @@ do
     echo "$date : $color"
     lastcolor=$color
   fi
-  cube "sphere $color;update\n" 
+  cube 'sphere $color ; update' 
   # and give it a chance to change
   sleep 10
 done
+
+# perl pod may get added so lets exit before thats an issue
+exit ;

@@ -10,4 +10,5 @@ if [ "$1" != "" ] ; then
   echo "$@" > $CUBE
 fi
 
-
+# perl pod may get added so lets exit before thats an issue
+exit ;

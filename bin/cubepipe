@@ -462,6 +462,7 @@ sub process_section {
         say "processing [$line] " if ($verbose);
         my ( $cmd, @args ) = split( /[\s,]/, $line );
         next if ( !$cmd );
+        chomp $cmd ;
         say "cmd '$cmd', args " . p(@args) if ($verbose);
 
         # lets not do any args error checking for now

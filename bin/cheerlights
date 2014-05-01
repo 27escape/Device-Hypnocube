@@ -19,7 +19,7 @@ do
     echo "$date : $color"
     lastcolor=$color
   fi
-  cube 'sphere $color ; update' 
+  cube "sphere $color ; update"
   # and give it a chance to change
   sleep 10
 done

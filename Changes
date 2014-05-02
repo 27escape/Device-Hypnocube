@@ -1,9 +1,9 @@
-* 1.6
+* 1.6 2014-05-02
   * remember to test scripts before release
   * cube now works again
   * allow ':' as a command separator, as well as ';'
-* 1.5
-  * cuibe script should not write if pipe not available
+* 1.5 2014-05-02
+  * cube script should not write if pipe not available
 * 1.4 2014-05-01
   * make sure cheerlights works
 * 1.3  2014-05-01

@@ -448,7 +448,7 @@ sub _background_matrix {
 # ### frame [64 sets of rgb values] in correct order
 # ### repeat 4
 # ### flash 5
-# we can have multiple lines split by semi-colons
+# we can have multiple lines split by semi-colons or colons
 
 sub process_section {
     my ( $cube, $sections, $verbose ) = @_;
@@ -492,7 +492,8 @@ sub process_section {
 sub process_line {
     my ( $cube, $lines, $verbose ) = @_;
     my @sections;
-    my @chunks = split( /;/, $lines );
+    # colons or semi colons, helps when using cube script without quotes
+    my @chunks = split( /[;:]/, $lines );
 
     foreach my $ele (@chunks) {
 

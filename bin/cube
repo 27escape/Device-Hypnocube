@@ -6,6 +6,17 @@
 
 CUBE=/tmp/hypnocube
 
+if [ -e $CUBE ] ; then
+  echo "cubepipe does not seem to be running"
+  exit 1
+fi
+
+
+if [ -p $CUBE ] ; then
+  echo "$CUBE is not a pipe"
+  exit 1
+fi
+
 if [ "$1" != "" ] ; then
   echo "$@" > $CUBE
 fi

@@ -72,10 +72,11 @@ use constant HYPNOCUBE_FLIP   => 80;
 use constant HYPNOCUBE_FRAME  => 81;
 use constant HYPNOCUBE_PIXEL  => 81;
 
-use constant X_SIZE      => 4;
-use constant Y_SIZE      => 4;
-use constant Z_SIZE      => 4;
-use constant BUFFER_SIZE => X_SIZE * Y_SIZE * Z_SIZE;
+use constant X_SIZE       => 4;
+use constant Y_SIZE       => 4;
+use constant Z_SIZE       => 4;
+use constant BUFFER_SIZE  => X_SIZE * Y_SIZE * Z_SIZE;
+use constant DEFAULT_COLOR => 'purple';
 
 use constant RATE_LIMIT_MSECS => 3333;    # 1/30 * 1e6
 
@@ -121,6 +122,7 @@ my %colors = (
     # magenta     => [ 0xa0, 0,    0xa0 ],
     pink => [ 0xf0, 0x00, 0x20 ]
 );
+my @color_names ;
 
 # ----------------------------------------------------------------------------
 # instance initialisation
@@ -200,8 +202,8 @@ around BUILDARGS => sub {
 
     # add extra color names for primaries and close relatives
     for ( my $i = 0; $i <= 3; $i++ ) {
-        my $c = ( 64 * ( $i + 1 ) ) ;
-        $c = $c > 256 ? 255 : $c ;
+        my $c = ( 64 * ( $i + 1 ) );
+        $c = $c >= 256 ? 255 : $c;
         my $p = $prefix[$i];
         $colors{ $p . "red" } = [ $c, 0, 0 ];
         $colors{ $p . "green" } = [ 0, $c, 0 ];
@@ -212,6 +214,7 @@ around BUILDARGS => sub {
         $colors{ $p . "cyan" } = [ 0, $c, $c ];
         $colors{ $p . "white" } = [ $c, $c, $c ];
     }
+    @color_names = keys %colors ;
 
     # now build the class properly
     return $class->$orig(@_);
@@ -722,7 +725,7 @@ show what colors are available
 
 sub list_colors {
     my $self = shift;
-    return keys %colors;
+    return @color_names;
 }
 
 # ----------------------------------------------------------------------------
@@ -737,7 +740,15 @@ sub get_color {
     my $self = shift;
     my ( $color, $green, $blue, $default ) = @_;
 
-    if ( defined $color && $color =~ /^(?:0[xX]|#)([[:xdigit:]]+)$/ && !defined $green && !defined $blue ) {
+    $color //= $default;
+    $color //= DEFAULT_COLOR;
+
+    if ( $color =~ /^rand(om)?/i ) {
+        my $r = int( rand( scalar( @color_names))) ;
+        ($color, $green, $blue) = @{$colors{$color_names[$r]}} ;
+    }
+
+    if ( $color =~ /^(?:0[xX]|#)([[:xdigit:]]+)$/ && !defined $green && !defined $blue ) {
         my $c = $1;
         if ( length($c) == 2 ) {
             $color = $green = $blue = hex($c);
@@ -754,20 +765,14 @@ sub get_color {
         }
     }
 
-    if ( defined $color && $color =~ /^\d+/ && !defined $green && !defined $blue ) {
+    if ( $color =~ /^\d+/ && !defined $green && !defined $blue ) {
         $green = $blue = $color;
     }
-    elsif ( !defined $color && !defined $green && !defined $blue ) {
-        $self->_debug("no color using default");
-        $color = $default;
-    }
     elsif ( !$colors{$color} && !defined $green && !defined $blue ) {
-        $self->_debug("unknown color $color, using white");
-        $color = 'white';
+        $self->_debug( "unknown color $color, using default: " . DEFAULT_COLOR );
+        $color = DEFAULT_COLOR;
     }
     ( $color, $green, $blue ) = @{ $colors{$color} } if ( $colors{$color} );
-
-    # say "$color, $green, $blue" ;
 
     return ( $color, $green, $blue );
 }

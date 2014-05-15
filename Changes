@@ -1,3 +1,6 @@
+* 1.7 2014-05-15
+  * now allows a random color
+  * more author tests
 * 1.6 2014-05-02
   * remember to test scripts before release
   * cube now works again

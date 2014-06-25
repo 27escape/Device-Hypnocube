@@ -7,8 +7,15 @@
 CUBE=/tmp/hypnocube
 
 if [ ! -e $CUBE ] ; then
-  echo "cubepipe does not seem to be running"
-  exit 1
+  ps ax|grep cubepipe |grep -vq grep
+  if [ "$?" == "1" ] ; then
+    echo "starting cube as it is not running"
+    cubepipe --daemon
+    sleep 3
+  else
+    echo "cubepipe is running, but there is no pipe ($CUBE)"
+    exit 1
+  fi
 fi
 
 if [ ! -p $CUBE ] ; then

@@ -41,6 +41,7 @@ use strict;
 use warnings;
 use Moo;
 use Time::HiRes qw( gettimeofday usleep);
+use WebColors;
 
 # get the crc stuff, this is the function we need
 use Digest::CRC qw( crcccitt );
@@ -72,10 +73,10 @@ use constant HYPNOCUBE_FLIP   => 80;
 use constant HYPNOCUBE_FRAME  => 81;
 use constant HYPNOCUBE_PIXEL  => 81;
 
-use constant X_SIZE       => 4;
-use constant Y_SIZE       => 4;
-use constant Z_SIZE       => 4;
-use constant BUFFER_SIZE  => X_SIZE * Y_SIZE * Z_SIZE;
+use constant X_SIZE        => 4;
+use constant Y_SIZE        => 4;
+use constant Z_SIZE        => 4;
+use constant BUFFER_SIZE   => X_SIZE * Y_SIZE * Z_SIZE;
 use constant DEFAULT_COLOR => 'purple';
 
 use constant RATE_LIMIT_MSECS => 3333;    # 1/30 * 1e6
@@ -101,28 +102,10 @@ my %errors = (
 );
 
 my %colors = (
-    black       => [ 0,    0,    0 ],
-    lilac       => [ 0xf0, 0,    0xf0 ],
-    orange      => [ 0xf0, 0x20, 0 ],
-    amber       => [ 0xf0, 0x20, 0 ],
-    warmwhite   => [ 0xa0, 0xa0, 0xa0 ],
-    purple      => [ 0x10, 0,    0x10 ],
-    lightpurple => [ 0x40, 0,    0x40 ],
 
-    # colors are now generated
-    # darkblue    => [ 0,    0,    0x10 ],
-    # blue        => [ 0,    0,    0xf0 ],
-    # cyan        => [ 0,    0x60, 0x60 ],
-    # darkgreen   => [ 0,    0x10, 0 ],
-    # green       => [ 0,    0xf0, 0 ],
-    # red         => [ 0xf0, 0,    0 ],
-    # darkred     => [ 0x10, 0,    0 ],
-    # white       => [ 0xf0, 0xf0, 0xf0 ],
-    # yellow      => [ 0xf0, 0xf0, 0 ],
-    # magenta     => [ 0xa0, 0,    0xa0 ],
-    pink => [ 0xf0, 0x00, 0x20 ]
+    # colors are generated in BUILDARGS
 );
-my @color_names ;
+my @color_names;
 
 # ----------------------------------------------------------------------------
 # instance initialisation
@@ -198,9 +181,17 @@ around BUILDARGS => sub {
     # here we can extract and extra args we want to process but do not have
     # object variables for
 
-    my @prefix = ( "dark", "mid", "", "bright" );
+    # add in the web_colors
+    # we reduce them by 75% as the LEDs are not that accurate
+    foreach my $c ( list_webcolors() ) {
+        my ( $r, $g, $b ) = colorname_to_rgb($c);
+
+        # reduce them as they are too bright
+        $colors{$c} = [ int( $r / 4 ), int( $g / 4 ), int( $b / 4 ) ];
+    }
 
     # add extra color names for primaries and close relatives
+    my @prefix = ( "dark", "mid", "", "bright" );
     for ( my $i = 0; $i <= 3; $i++ ) {
         my $c = ( 64 * ( $i + 1 ) );
         $c = $c >= 256 ? 255 : $c;
@@ -214,7 +205,18 @@ around BUILDARGS => sub {
         $colors{ $p . "cyan" } = [ 0, $c, $c ];
         $colors{ $p . "white" } = [ $c, $c, $c ];
     }
-    @color_names = keys %colors ;
+
+    # define some colors by hand as we want them more vibrant or they
+    # are not quite right in WebColors
+
+    $colors{lilac}       = [ 0xf0, 0,    0xf0 ];
+    $colors{orange}      = [ 0xf0, 0x20, 0 ];
+    $colors{amber}       = [ 0xf0, 0x20, 0 ];
+    $colors{warmwhite}   = [ 0xa0, 0xa0, 0xa0 ];
+    $colors{lightpurple} = [ 0x40, 0,    0x40 ];
+    $colors{pink}        = [ 0xf0, 0x00, 0x20 ];
+
+    @color_names = keys %colors;
 
     # now build the class properly
     return $class->$orig(@_);
@@ -744,8 +746,8 @@ sub get_color {
     $color //= DEFAULT_COLOR;
 
     if ( $color =~ /^rand(om)?/i ) {
-        my $r = int( rand( scalar( @color_names))) ;
-        ($color, $green, $blue) = @{$colors{$color_names[$r]}} ;
+        my $r = int( rand( scalar(@color_names) ) );
+        ( $color, $green, $blue ) = @{ $colors{ $color_names[$r] } };
     }
 
     if ( $color =~ /^(?:0[xX]|#)([[:xdigit:]]+)$/ && !defined $green && !defined $blue ) {

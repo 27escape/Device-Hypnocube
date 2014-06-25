@@ -384,7 +384,7 @@ sub _background_matrix {
             $count++;
 
             # we will change the state every 15 ticks
-            $count %= FREQUENCY ;
+            $count %= ( FREQUENCY / 2 );
             if ( !$count ) {
 
                 # get the buffer just to get the correct sized thing
@@ -492,6 +492,7 @@ sub process_section {
 sub process_line {
     my ( $cube, $lines, $verbose ) = @_;
     my @sections;
+
     # colons or semi colons, helps when using cube script without quotes
     my @chunks = split( /[;:]/, $lines );
 

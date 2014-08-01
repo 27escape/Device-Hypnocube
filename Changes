@@ -1,3 +1,6 @@
+1.9 2014-08-01
+  * add MetaResources into dist.ini
+  * restart option for cubepipe
 1.8 2014-06-25
   * script cube will start cubepipe if its not running
   * use WebColors

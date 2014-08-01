@@ -27,6 +27,7 @@ use Time::HiRes qw( sleep);
 use Try::Tiny;
 use App::Basis;
 use Data::Printer;
+use Proc::ProcessTable;
 
 # ----------------------------------------------------------------------------
 
@@ -36,7 +37,7 @@ use constant PULSE_SLEEP => 0.2;
 # 30 times/second is the highest frequency we can write to the cube
 use constant FREQUENCY => 30;
 
-# dreive a clock tick, make sure its fractional and not an int!
+# derive a clock tick, make sure its fractional and not an int!
 use constant TICK => 1.0 / FREQUENCY;
 
 # ----------------------------------------------------------------------------
@@ -574,10 +575,23 @@ my %opt = init_app(
         'pipe|p=s'   => "named pipe to use/create [default: $DEFAULT_FIFO]",
         'remove|r'   => 'remove pipe on program exit',
         'daemon'     => 'run as a daemon process, otherwise will remain in foreground',
+        'restart'    => 'kill any running cubepipe',
         'verbose'    => 'tell us whats going on'
     },
     cleanup => \&cleanup_func    # optional func to call to clean up
 );
+
+if( $opt{restart}) {
+    my $t = new Proc::ProcessTable;
+    foreach my $p ( @{$t->table} ){
+        my $cmndline = $p->{cmndline} || $p->{fname};
+        my $prog = get_program() ;
+        if ($cmndline =~ /^perl .*?$prog/) {
+            next if($p->pid == $$ );
+            kill( 'KILL', $p->pid) ;
+        }
+    }
+}
 
 # set defaults if needed
 $opt{device} ||= $DEVICE;

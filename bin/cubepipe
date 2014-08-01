@@ -584,9 +584,9 @@ my %opt = init_app(
 if( $opt{restart}) {
     my $t = new Proc::ProcessTable;
     foreach my $p ( @{$t->table} ){
-        my $cmndline = $p->{cmndline} || $p->{fname};
-        my $prog = get_program() ;
-        if ($cmndline =~ /^perl .*?$prog/) {
+        my $cmnline = $p->{cmndline} || $p->{fname};
+        my $prog = $0 ;
+        if ($cmnline =~ /^perl .*?$prog/) {
             next if($p->pid == $$ );
             kill( 'KILL', $p->pid) ;
         }

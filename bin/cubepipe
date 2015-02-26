@@ -590,6 +590,7 @@ if( $opt{restart}) {
                 next if( $l !~ /$0/) ;
                 $l =~ /^(\d+)\s+(.*?)\s+(.*?)\s+(\d+:\d+)\s+(.*)/ ;
                 my ($pid, $process) = ($1, $5) ;
+                next if( !$pid) ;
                 # kill whatever we find, that is not us
                 if( $pid != $$) {
                     say "killing $pid - $process" if( $opt{verbose});

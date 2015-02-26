@@ -1,3 +1,5 @@
+1.9.2 2015-02-26
+  * minor issue checking processes for restart option
 1.9.1 2015-02-26
   * cheerlights writes direct to the pipe rather than using cube script
   * drop Proc::ProcessTable as it kept seg faulting

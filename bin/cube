@@ -9,23 +9,24 @@ CUBE=/tmp/hypnocube
 if [ ! -e $CUBE ] ; then
   ps ax|grep cubepipe |grep -vq grep
   if [ "$?" == "1" ] ; then
-    echo "starting cube as it is not running"
+    echo STDERR "starting cube as it is not running"
     cubepipe --daemon
     sleep 3
   else
-    echo "cubepipe is running, but there is no pipe ($CUBE)"
-    exit 1
+    echo STDERR "cubepipe is running, but there is no pipe ($CUBE) - restarting"
+    cubepipe --restart --daemon
+    sleep 3
   fi
 fi
 
+status=1
 if [ ! -p $CUBE ] ; then
-  echo "$CUBE is not a pipe"
-  exit 1
+  echo STDERR "$CUBE is not a pipe"
+else
+  if [ "$1" != "" ] ; then
+    echo "$@" >> $CUBE
+    status=0
+  fi
 fi
-
-if [ "$1" != "" ] ; then
-  echo "$@" > $CUBE
-fi
-
 # perl pod may get added so lets exit before thats an issue
-exit ;
+exit $status 

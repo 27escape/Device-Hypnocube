@@ -6,6 +6,13 @@
 # http://www.cheerlights.com/control-cheerlights
 # Example Tweet: @CheerLights Paint the town red
 
+CUBE=/tmp/hypnocube
+
+SLEEP=60
+if [ "$1" != "" ] ; then
+  SLEEP=$1
+fi
+
 lastcolor=""
 while true
 do
@@ -19,9 +26,9 @@ do
     echo "$date : $color"
     lastcolor=$color
   fi
-  cube "sphere $color ; update"
+  echo "sphere $color ; update" >> $CUBE
   # and give it a chance to change
-  sleep 10
+  sleep $SLEEP
 done
 
 # perl pod may get added so lets exit before thats an issue

@@ -13,7 +13,8 @@
 
 =head1 DESCRIPTION
 
-Control the 4x4x4 Hypnocube available from usb.brando.com
+Control the 4x4x4 Hypnocube available from usb.brando.com 
+(http://usb.brando.com/4x4x4-multi-color-led-cube_p01963c35d15.html)
 see also http://www.hypnocube.com/
 I consider the front to be the side with the power and serial connectors
 0,0,0 is then at bottom back left
@@ -749,11 +750,24 @@ sub get_color {
         my $r = int( rand( scalar(@color_names) ) );
         ( $color, $green, $blue ) = @{ $colors{ $color_names[$r] } };
     }
+    # alias for black
+    if ( $color =~ /^(clear|off)$/i ) {
+        ( $color, $green, $blue ) = (0, 0, 0);
+    }
+
+    my $tc = colorname_to_hex( $color) ;
+    $color = "#$tc" if( $tc) ;
 
     if ( $color =~ /^(?:0[xX]|#)([[:xdigit:]]+)$/ && !defined $green && !defined $blue ) {
         my $c = $1;
         if ( length($c) == 2 ) {
             $color = $green = $blue = hex($c);
+        }
+        elsif ( length($c) == 3 ) {
+            $c =~ /([[:xdigit:]])([[:xdigit:]])([[:xdigit:]])/;
+            $color = hex("$1$1");
+            $green = hex("$2$2");
+            $blue  = hex("$3$3");
         }
         elsif ( length($c) == 6 ) {
             $c =~ /([[:xdigit:]]{2})([[:xdigit:]]{2})([[:xdigit:]]{2})/;

@@ -62,17 +62,26 @@ my %pulse_colors = (
 my %valid_commands = (
 
     # repeat is a special command handled in process_line
+    # I did consider having an alias thing for the aliases
+    # but TBH repetition is much easier!
     update   => \&_update,
+    all      => \&_clear,
     cls      => \&_clear,
     clear    => \&_clear,
     pix      => \&_pixel,
     pixel    => \&_pixel,
+    xyz      => \&_pixel,
+    i        => \&_position,
+    index    => \&_position,
     pos      => \&_position,
     position => \&_position,
+    x        => \&_xplane,
     xp       => \&_xplane,
     xplane   => \&_xplane,
+    y        => \&_yplane,
     yp       => \&_yplane,
     yplane   => \&_yplane,
+    z        => \&_zplane,
     zp       => \&_zplane,
     zplane   => \&_zplane,
     sphere   => \&_sphere,
@@ -562,6 +571,97 @@ sub nb_readlines {
 }
 
 # ----------------------------------------------------------------------------
+
+sub commands {
+
+    return '
+
+It is easiest to use the cube command to control the cube, alternately send
+the command to the pipe /tmp/hypnocube with echo "command" > /tmp/hypnocube
+
+Colors can be either by HTML name (red,blue), by rgb values (255,255,0) or by 
+hex triplet (#FF0000 or 0xFF0000). Short versions of these are also possible
+#FF0 or 0X0ff.
+
+Additionally "random" picks a random color and "clear"  or "off" is an alias for black.
+
+Cube Commands
+
+update   
+    update the sube with the commands that have been entered
+
+all, cls, clear {color}
+    set all the LEDS to the named color
+    requires update
+    a random color will set the entire cube to a random value
+    cube all 255,255,255 : update
+    cube all 255 0 0 : update
+
+pix, pixel, xyz  {x} {y} {z} {color}
+    set a single pixel referenced with coordinates to a color
+    requires update
+    cube pixel 3 2 1 red : update
+
+pos, position, index, i {index} {color}
+    set a single pixel referenced with an index 0..63 to a color
+    requires update
+    cube index 23 red : update
+
+x, xp, xplane {plane} {color} 
+    set all LEDS in an X plane to a color
+    requires update
+    a random color will set all LEDS in the plane to different values
+    cube xp 1 darkslategray : update
+
+y, yp, yplane {plane} {color}
+    set all LEDS in an Y plane to a color
+    requires update
+    a random color will set all LEDS in the plane to different values
+    cube yplane 1 pink : update
+
+z, zp, zplane {plane} {color}
+    set all LEDS in an Z plane to a color
+    requires update
+    a random color will set all LEDS in the plane to different values
+    cube z 1 goldenrod : update
+
+sphere {color}  
+    create a sphere of LEDS in the given color
+    requires update
+    a random color will set the entire sphere to a random value
+    cube sphere random : update
+
+sleep {time}
+    pause the activity for a number of seconds
+
+pulse {times} {color}
+    clears the cube and the pulses the color for a maximum of 3 times
+    requires update
+    cube pulse 2 green
+
+flash {times}   
+    flash the current cube setting on and off for a number of times
+    this happends in the background so can be interrupted by another command
+    does not requires update
+    cube flash 10
+
+matrix {color}
+    run a matrix effect in the background, continues until another command
+    is called
+    does not require update
+    cube matrix random ; sleep 60 ; cube sphere darkblue : update
+
+colors  
+    show each LED as a different color 
+    requires update
+    cube colors : update
+
+' ;
+
+
+}
+
+# ----------------------------------------------------------------------------
 # main
 
 my %opt = init_app(
@@ -575,10 +675,17 @@ my %opt = init_app(
         'remove|r'   => 'remove pipe on program exit',
         'daemon'     => 'run as a daemon process, otherwise will remain in foreground',
         'restart'    => 'kill any running cubepipe',
-        'verbose'    => 'tell us whats going on'
+        'verbose'    => 'tell us whats going on',
+        'commands'   => 'describe all the commands that can be sent'
+
     },
     cleanup => \&cleanup_func    # optional func to call to clean up
 );
+
+if( $opt{commands}) {
+
+    msg_exit( commands(),1) ;
+}
 
 if( $opt{restart}) {
     if( $^O ne 'MSWin32') {

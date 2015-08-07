@@ -114,7 +114,8 @@ if [ ! -p $CUBE ] ; then
   echo STDERR "$CUBE is not a pipe"
 else
   if [ "$1" != "" ] ; then
-    echo "$@" >> $CUBE
+    # make sure we do not follow on from last instruction
+    echo ": $@" >> $CUBE
     status=0
   fi
 fi

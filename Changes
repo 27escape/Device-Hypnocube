@@ -1,4 +1,6 @@
 1.9.3 2015-08-07
+  * new commands xline, yline, zline
+1.9.3 2015-08-07
   * use new WebColors
 1.9.2 2015-02-26
   * minor issue checking processes for restart option
